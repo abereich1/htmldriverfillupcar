@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Driver Seat Manager</title>
+<style>
+  :root{--bg:#f4f6f8;--card:#fff;--text:#2c3e50;--muted:#636e72;--green:#2ecc71;--red:#e74c3c;--pink:#FF69B4;--gray:#95a5a6;--accent:#3498db;}
+  body.dark{--bg:#1e2530;--card:#2c3440;--text:#ecf0f1;--muted:#a0a8b0;}
+  *{box-sizing:border-box;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+  body{margin:0;background:var(--bg);color:var(--text);transition:.2s;}
+  header{background:var(--card);border-bottom:1px solid rgba(0,0,0,.1);padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;}
+  header h1{font-size:18px;margin:0;}
+  header input{padding:6px 8px;border-radius:6px;border:1px solid #dcdde1;background:var(--card);color:var(--text);}
+  button{cursor:pointer;border:none;border-radius:6px;padding:8px 12px;font-size:14px;background:var(--accent);color:#fff;}
+  button.secondary{background:var(--gray);}
+  button.danger{background:var(--red);}
+  button.success{background:var(--green);}
+  button.small{font-size:11px;padding:5px 8px;}
+  #controls{padding:14px 16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;}
+  #car-wrap{padding:10px;display:flex;justify-content:center;overflow-x:auto;}
+  #car{position:relative;background:linear-gradient(180deg,#dfe6e9,#c9d2d6);border-radius:40px 40px 16px 16px;border:4px solid #95a1a6;overflow:visible;margin:0 auto;}
+  .seat{position:absolute;width:56px;height:58px;border-radius:10px 10px 14px 14px;background:var(--red);box-shadow:inset 0 6px 0 rgba(0,0,0,.15), 0 2px 6px rgba(0,0,0,.3);user-select:none;cursor:pointer;z-index:1;}
+  .seat::before{content:'';position:absolute;bottom:-10px;left:8px;right:8px;height:16px;border-radius:0 0 8px 8px;background:inherit;box-shadow:inset 0 3px 0 rgba(0,0,0,.15);}
+  .seat.confirmed{background:var(--green);}
+  .seat.empty{background:var(--gray);}
+  .seat.pending-female{background:var(--pink);}
+  .seat .label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:11px;color:#fff;text-align:center;padding:4px;}
+  .seat .male{color:#0D47A1;text-shadow:0 0 3px #fff;}
+  .seat .female{color:#880E4F;text-shadow:0 0 3px #fff;}
+  .seat-num-badge{position:absolute;top:2px;left:4px;font-size:9px;font-weight:bold;color:rgba(255,255,255,.85);background:rgba(0,0,0,.25);border-radius:4px;padding:0 3px;z-index:2;}
+  .driver{position:absolute;width:56px;height:58px;border-radius:10px 10px 14px 14px;background:#34495e;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:11px;z-index:1;}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);align-items:center;justify-content:center;z-index:50;padding:16px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--card);color:var(--text);border-radius:12px;padding:20px;max-width:440px;width:100%;max-height:90vh;overflow-y:auto;}
+  .modal h2{margin-top:0;font-size:18px;}
+  .field{margin-bottom:10px;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .field input, .field select, .field textarea{width:100%;padding:8px;border-radius:6px;border:1px solid #dcdde1;font-size:14px;background:var(--card);color:var(--text);}
+  .contact-options{display:flex;gap:10px;font-size:13px;}
+  .candidate-row{border:1px solid #dcdde1;border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;gap:8px;}
+  .candidate-row.confirmed{border-color:var(--green);}
+  .candidate-info{font-size:13px;flex:1;}
+  .candidate-actions{display:flex;flex-direction:column;gap:4px;}
+  .candidate-actions button{font-size:11px;padding:4px 6px;}
+  .warning-banner{background:#fff3cd;border:1px solid #ffeeba;color:#856404;padding:8px;border-radius:6px;font-size:12px;margin-bottom:10px;}
+  .close-btn{float:right;background:transparent;color:var(--muted);font-size:20px;padding:0 6px;}
+  .contact-row{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+  .contact-row button{flex:1;font-size:11px;padding:6px 4px;background:#0984e3;}
+  .contact-row button.preferred{outline:2px solid #f1c40f;}
+  .maps-row{display:flex;gap:6px;margin-top:4px;}
+  .maps-row button{flex:1;font-size:12px;padding:6px;background:#0984e3;}
+  .wa-status{font-size:11px;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  #settingsCarWrap{overflow-x:auto;padding:10px 0;}
+  #layoutEditor{position:relative;margin:10px auto;background:#dfe6e9;border-radius:20px 20px 10px 10px;}
+  .track-line{position:absolute;height:2px;background-image:repeating-linear-gradient(to right,#7f8c9a 0 8px, transparent 8px 16px);opacity:.8;z-index:0;}
+  .col-line{position:absolute;width:2px;background-image:repeating-linear-gradient(to bottom,#95a5a6 0 8px, transparent 8px 16px);opacity:.5;z-index:0;}
+  .layout-seat{position:absolute;width:50px;height:50px;border-radius:10px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;cursor:grab;touch-action:none;z-index:2;}
+  .layout-driver{position:absolute;width:50px;height:50px;border-radius:10px;background:#34495e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:grab;touch-action:none;z-index:2;}
+  small.hint{color:var(--muted);}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .switch{position:relative;display:inline-block;width:46px;height:24px;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:24px;transition:.2s;}
+  .slider::before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;}
+  input:checked + .slider{background:#34495e;}
+  input:checked + .slider::before{transform:translateX(22px);}
+  .coffee-link{display:inline-block;margin-top:6px;background:#FFDD00;color:#2c3e50;padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:13px;}
+  .dash-stat{font-size:15px;margin-bottom:8px;}
+  .dash-net-pos{color:var(--green);font-weight:bold;}
+  .dash-net-neg{color:var(--red);font-weight:bold;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🚐 Trip Manifest</h1>
+  <input id="tripName" placeholder="Trip name (e.g. MTL→BKN Jul 6)" />
+  <div class="row">
+    <button class="secondary" onclick="openDashboard()">📊 Dashboard</button>
+    <button class="secondary" onclick="openSettings()">⚙ Settings</button>
+  </div>
+</header>
+<div id="controls">
+  <button class="secondary" onclick="exportManifest()">Copy Manifest</button>
+  <button class="danger" onclick="resetTrip()">New Trip</button>
+</div>
+<div id="car-wrap"><div id="car"></div></div>
+
+<!-- SEAT MODAL -->
+<div class="modal-overlay" id="seatModal" onclick="if(event.target===this) closeModal()">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+    <h2 id="seatModalTitle">Seat details</h2>
+    <div id="candidateList"></div>
+    <button id="addPassengerBtn" onclick="showPassengerForm()">+ Add Passenger</button>
+    <div id="passengerForm" style="display:none;margin-top:14px;border-top:1px solid rgba(0,0,0,.1);padding-top:12px;">
+      <div id="blockWarning" class="warning-banner" style="display:none;"></div>
+      <div class="field"><label>Name</label><input id="pName"></div>
+      <div class="field"><label>Gender</label><select id="pGender"><option value="">-</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+      <div class="field"><label>Phone Number</label><input id="pPhone" type="tel" inputmode="numeric" oninput="sanitizePhone(this); checkBlocklist()"></div>
+      <div class="field"><label>Preferred Contact</label>
+        <div class="contact-options">
+          <label><input type="checkbox" id="cWhatsapp"> WhatsApp</label>
+          <label><input type="checkbox" id="cText"> Text</label>
+          <label><input type="checkbox" id="cCall"> Call</label>
+        </div>
+      </div>
+      <div class="field"><label>Pickup Address</label><input id="pPickup" oninput="liveAddressSearch(this,'pickupList')" list="pickupList" autocomplete="off"><datalist id="pickupList"></datalist></div>
+      <div class="field"><label>Dropoff Address</label><input id="pDropoff" oninput="liveAddressSearch(this,'dropoffList')" list="dropoffList" autocomplete="off"><datalist id="dropoffList"></datalist></div>
+      <div class="field"><label>Fare Amount ($)</label><input id="pTip" type="text" inputmode="decimal" oninput="sanitizeAmount(this)"></div>
+      <div class="field"><label>Notes</label><textarea id="pNotes" rows="2"></textarea></div>
+      <div class="field"><label><input type="checkbox" id="pConfirmed"> Confirmed (seat turns green)</label></div>
+      <button class="success" onclick="savePassenger()">Save Passenger</button>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD MODAL -->
+<div class="modal-overlay" id="dashboardModal" onclick="if(event.target===this) closeDashboard()">
+  <div class="modal">
+    <button class="close-btn" onclick="closeDashboard()">&times;</button>
+    <h2>Driver Dashboard</h2>
+    <div id="dashStats"></div>
+    <hr>
+    <div class="field"><label>Trip gas cost, total ($)</label>
+      <input id="gasCostInput" type="text" inputmode="decimal" oninput="sanitizeAmount(this)" onchange="saveGasCost()">
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal" onclick="if(event.target===this) closeSettings()">
+  <div class="modal" style="max-width:520px;">
+    <button class="close-btn" onclick="closeSettings()">&times;</button>
+    <h2>Settings</h2>
+    <div class="field">
+      <label>How many seats does your vehicle have? (including the driver)</label>
+      <div class="row"><input id="seatCountInput" type="number" min="2" max="20" style="width:80px;">
+      <button onclick="regenerateLayout()">Auto-Build Layout</button></div>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <button class="small" onclick="addRow()">+ Row</button>
+      <button class="small secondary" onclick="removeRow()">- Row</button>
+    </div>
+    <div id="settingsCarWrap"><div id="layoutEditor"></div></div>
+    <button class="success" onclick="saveLayout()">Save Layout as Default</button>
+    <hr>
+    <div class="field"><label>Dark Mode</label>
+      <label class="switch"><input type="checkbox" id="themeToggle" onchange="toggleTheme()"><span class="slider"></span></label>
+    </div>
+    <hr>
+    <div class="field"><label>Blocked Customers</label><div id="blockedList"></div></div>
+    <hr>
+    <a class="coffee-link" href="https://www.buymeacoffee.com/YOUR-USERNAME-HERE" target="_blank">☕ Buy Me a Coffee</a>
+  </div>
+</div>
+
+<script>
+/* REAL-WORLD SEAT LAYOUT KNOWLEDGE TABLE (unchanged research base) */
+const VEHICLE_SEAT_KNOWLEDGE = {
+  5:  [1,3],
+  6:  [1,2,2],
+  7:  [1,2,3],
+  8:  [1,3,3],
+  9:  [1,3,3,2],
+  12: [2,3,3,3],
+  15: [2,3,3,3,3]
+};
+function getRowPattern(totalSeats){
+  const passengerSeats = Math.max(0, totalSeats-1);
+  if(VEHICLE_SEAT_KNOWLEDGE[totalSeats]) return VEHICLE_SEAT_KNOWLEDGE[totalSeats];
+  let rows = []; let remaining = passengerSeats;
+  const frontSize = totalSeats>=11 ? 2 : 1;
+  rows.push(Math.min(frontSize, remaining)); remaining -= rows[0];
+  if(remaining===5){ rows.push(2); rows.push(3); remaining=0; }
+  else { while(remaining>0){ const take=Math.min(3,remaining); rows.push(take); remaining-=take; } }
+  return rows;
+}
+// Maps a row's passenger count to which of the 3 fixed lanes (0=left,1=center,2=right) it occupies.
+function colsForCount(count, isFrontRow){
+  if(count<=0) return [];
+  if(count===1) return isFrontRow ? [2] : [1];
+  if(count===2) return [0,2];
+  return [0,1,2];
+}
+
+const TRACK_WIDTH=300, ROW_H=80, TOP_PAD=24, SEAT_W=56;
+const COL_CENTERS=[50,150,250]; // 3 fixed vertical lanes, left/center/right
+function colX(col){ return COL_CENTERS[col]-SEAT_W/2; }
+function colFromClickX(x){ return x<100?0:(x<200?1:2); }
+
+let settings = JSON.parse(localStorage.getItem('driverSettings')||'null') || {grid:null, theme:'light', gasCost:0};
+let directory = JSON.parse(localStorage.getItem('customerDirectory')||'{}');
+let state = JSON.parse(localStorage.getItem('tripState')||'null');
+let activeSeatId=null, editingCandidateId=null;
+
+function saveAll(){
+  localStorage.setItem('driverSettings',JSON.stringify(settings));
+  localStorage.setItem('customerDirectory',JSON.stringify(directory));
+  localStorage.setItem('tripState',JSON.stringify(state));
+}
+function sanitizePhone(el){ el.value = el.value.replace(/[a-zA-Z]/g,''); }
+function sanitizeAmount(el){ el.value = el.value.replace(/[^0-9.]/g,'').replace(/(\..*)\./g,'$1'); }
+
+function buildDefaultGrid(totalSeats){
+  const rowPattern = getRowPattern(totalSeats);
+  let seats=[]; let idx=0;
+  rowPattern.forEach((count,rowIdx)=>{
+    const cols = colsForCount(count, rowIdx===0);
+    cols.forEach(col=>{ seats.push({id:'s'+idx, row:rowIdx, col}); idx++; });
+  });
+  return {rowCount: rowPattern.length, seats, driverCol:0};
+}
+if(!settings.grid) settings.grid = buildDefaultGrid(7);
+if(!state) state = {tripName:'', driverCol: settings.grid.driverCol||0, seats: settings.grid.seats.map(s=>({id:s.id,row:s.row,col:s.col,passengers:[],confirmedId:null}))};
+if(state.driverCol===undefined) state.driverCol = settings.grid.driverCol||0;
+if(settings.theme==='dark') document.body.classList.add('dark');
+
+document.getElementById('tripName').value = state.tripName;
+document.getElementById('tripName').oninput = e=>{ state.tripName=e.target.value; saveAll(); };
+
+function orderedSeats(seatsArr){ return [...seatsArr].sort((a,b)=> (a.row-b.row) || (a.col-b.col)); }
+function getSeatNumber(seatsArr, seatId){ return orderedSeats(seatsArr).findIndex(s=>s.id===seatId)+1; }
+
+// ---------- FRONT END (clean, no lines at all) ----------
+const car = document.getElementById('car');
+function sizeCar(){
+  const rows = Math.max(...state.seats.map(s=>s.row),0)+1;
+  car.style.width = (TRACK_WIDTH+60)+'px';
+  car.style.height = (TOP_PAD + rows*ROW_H + 40)+'px';
+}
+function renderSeats(){
+  car.innerHTML='';
+  sizeCar();
+  const driver = document.createElement('div'); driver.className='driver';
+  driver.style.left=(colX(state.driverCol)+40)+'px'; driver.style.top=TOP_PAD+'px'; driver.innerHTML='🧑‍✈️<br>Driver';
+  car.appendChild(driver);
+  state.seats.forEach(seat=>{
+    const num = getSeatNumber(state.seats, seat.id);
+    const el = document.createElement('div');
+    const confirmedP = seat.passengers.find(p=>p.id===seat.confirmedId);
+    let cls='seat';
+    if(confirmedP) cls+=' confirmed';
+    else if(seat.passengers.length){ if(seat.passengers[0].gender==='Female') cls+=' pending-female'; }
+    else cls+=' empty';
+    el.className=cls;
+    el.style.left=(colX(seat.col)+40)+'px'; el.style.top=(TOP_PAD+seat.row*ROW_H)+'px';
+    let inner = confirmedP ? `<span class="${(confirmedP.gender||'').toLowerCase()}">${confirmedP.name.split(' ')[0]}</span>`
+      : (seat.passengers.length===1 ? `<span class="${(seat.passengers[0].gender||'').toLowerCase()}">${seat.passengers[0].name.split(' ')[0]||''}</span>`
+      : (seat.passengers.length>1 ? seat.passengers.length+' opts' : ''));
+    el.innerHTML = `<div class="seat-num-badge">${num}</div><div class="label">${inner}</div>`;
+    el.addEventListener('click',()=>openSeatModal(seat.id));
+    car.appendChild(el);
+  });
+}
+function resetTrip(){
+  if(confirm('Start a new trip? Seat layout stays, all passengers clear.')){
+    state.seats = settings.grid.seats.map(s=>({id:s.id,row:s.row,col:s.col,passengers:[],confirmedId:null}));
+    state.driverCol = settings.grid.driverCol||0;
+    state.tripName=''; document.getElementById('tripName').value='';
+    saveAll(); renderSeats();
+  }
+}
+function openSeatModal(seatId){
+  activeSeatId=seatId;
+  const seat = state.seats.find(s=>s.id===seatId);
+  const num = getSeatNumber(state.seats, seatId);
+  document.getElementById('seatModalTitle').textContent = 'Seat '+num;
+  document.getElementById('passengerForm').style.display='none';
+  if(seat.passengers.length===0){
+    document.getElementById('candidateList').innerHTML='<small class="hint">No passenger yet.</small>';
+    showPassengerForm();
+    document.getElementById('seatModal').classList.add('open');
+    document.getElementById('addPassengerBtn').style.display='none';
+    return;
+  }
+  renderCandidateList(seat);
+  document.getElementById('addPassengerBtn').style.display = seat.confirmedId ? 'none' : 'inline-block';
+  document.getElementById('seatModal').classList.add('open');
+}
+function renderCandidateList(seat){
+  const list = document.getElementById('candidateList'); list.innerHTML='';
+  seat.passengers.forEach(p=>{
+    const row=document.createElement('div');
+    row.className='candidate-row'+(seat.confirmedId===p.id?' confirmed':'');
+    const dirEntry = directory[p.phone] || {};
+    const waStatus = dirEntry.hasWhatsApp===true ? '✅ Has WhatsApp' : (dirEntry.hasWhatsApp===false ? '❌ No WhatsApp' : '❔ Not checked yet');
+    const pref = (p.contact||[]);
+    row.innerHTML = `<div class="candidate-info"><b class="${(p.gender||'').toLowerCase()}">${p.name||'(no name)'}</b> ${p.gender?('- '+p.gender):''}<br>
+      📞 ${p.phone||'-'} (${pref.join(', ')||'no pref'})<br>
+      From: ${p.pickup||'-'}<br>To: ${p.dropoff||'-'}<br>Fare: $${p.tip||0}<br>
+      ${p.notes?('Notes: '+p.notes+'<br>'):''}
+      <div class="maps-row"><button onclick="openMaps('${encodeURIComponent(p.pickup||'')}')">Pickup Maps</button>
+      <button onclick="openMaps('${encodeURIComponent(p.dropoff||'')}')">Dropoff Maps</button></div>
+      <div class="contact-row">
+        <button class="${pref.includes('WhatsApp')?'preferred':''}" onclick="openWhatsAppChat('${p.id}')">WhatsApp</button>
+        <button class="${pref.includes('Text')?'preferred':''}" onclick="openText('${p.id}')">Text</button>
+        <button class="${pref.includes('Call')?'preferred':''}" onclick="openCall('${p.id}')">Call</button>
+      </div>
+      <div class="wa-status">${waStatus}
+        <select onchange="setWhatsAppStatus('${p.phone}', this.value)" style="width:auto;padding:2px;">
+          <option value="">Mark...</option>
+          <option value="yes">Has WhatsApp</option>
+          <option value="no">No WhatsApp</option>
+        </select>
+      </div>
+      </div>
+      <div class="candidate-actions">
+      <button class="success" onclick="confirmPassenger('${p.id}')">${seat.confirmedId===p.id?'Confirmed ✓':'Confirm'}</button>
+      <button class="secondary" onclick="editPassenger('${p.id}')">Edit</button>
+      <button class="secondary" onclick="movePassenger('${p.id}')">Move Seat</button>
+      <button class="danger" onclick="blockPassenger('${p.id}')">Block</button>
+      <button class="danger" onclick="removePassenger('${p.id}')">Remove</button></div>`;
+    list.appendChild(row);
+  });
+}
+function closeModal(){ document.getElementById('seatModal').classList.remove('open'); editingCandidateId=null; renderSeats(); }
+function openMaps(addr){ if(!addr) return alert('No address entered'); window.open('https://www.google.com/maps/dir/?api=1&destination='+addr,'_blank'); }
+function getDigits(p){ return (p.phone||'').replace(/\D/g,''); }
+function openWhatsAppChat(pid){ const seat=state.seats.find(s=>s.id===activeSeatId); const p=seat.passengers.find(x=>x.id===pid); const d=getDigits(p); if(!d) return alert('No phone number saved.'); window.open(`https://wa.me/${d}`,'_blank'); }
+function openText(pid){ const seat=state.seats.find(s=>s.id===activeSeatId); const p=seat.passengers.find(x=>x.id===pid); const d=getDigits(p); if(!d) return alert('No phone number saved.'); window.location.href=`sms:${d}`; }
+function openCall(pid){ const seat=state.seats.find(s=>s.id===activeSeatId); const p=seat.passengers.find(x=>x.id===pid); const d=getDigits(p); if(!d) return alert('No phone number saved.'); window.location.href=`tel:${d}`; }
+function setWhatsAppStatus(phone, val){
+  if(!phone) return;
+  directory[phone] = directory[phone] || {blocked:false, reason:'', history:[]};
+  directory[phone].hasWhatsApp = val==='yes' ? true : (val==='no' ? false : null);
+  saveAll(); renderCandidateList(state.seats.find(s=>s.id===activeSeatId));
+}
+function showPassengerForm(){ editingCandidateId=null; clearForm(); document.getElementById('passengerForm').style.display='block'; }
+function clearForm(){
+  ['pName','pPhone','pPickup','pDropoff','pTip','pNotes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pGender').value=''; document.getElementById('cWhatsapp').checked=false;
+  document.getElementById('cText').checked=false; document.getElementById('cCall').checked=false;
+  document.getElementById('pConfirmed').checked=false; document.getElementById('blockWarning').style.display='none';
+}
+function checkBlocklist(){
+  const phone=document.getElementById('pPhone').value.trim();
+  const warn=document.getElementById('blockWarning'); const entry=directory[phone];
+  if(entry && entry.blocked){ warn.style.display='block'; warn.textContent='⚠️ Previously blocked. Reason: '+(entry.reason||'no reason given'); }
+  else warn.style.display='none';
+}
+let addressTimer=null;
+function liveAddressSearch(input, listId){
+  clearTimeout(addressTimer);
+  const q = input.value.trim();
+  if(q.length<3) return;
+  addressTimer = setTimeout(async ()=>{
+    try{
+      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5`);
+      const data = await res.json();
+      const dl = document.getElementById(listId); dl.innerHTML='';
+      (data.features||[]).forEach(f=>{
+        const p = f.properties;
+        const parts = [p.housenumber, p.street||p.name, p.city, p.state, p.country].filter(Boolean);
+        const opt = document.createElement('option'); opt.value = parts.join(', ');
+        dl.appendChild(opt);
+      });
+    }catch(e){}
+  }, 350);
+}
+function editPassenger(pid){
+  const seat = state.seats.find(s=>s.id===activeSeatId); const p = seat.passengers.find(x=>x.id===pid);
+  editingCandidateId=pid;
+  document.getElementById('pName').value=p.name||''; document.getElementById('pGender').value=p.gender||'';
+  document.getElementById('pPhone').value=p.phone||'';
+  document.getElementById('cWhatsapp').checked=(p.contact||[]).includes('WhatsApp');
+  document.getElementById('cText').checked=(p.contact||[]).includes('Text');
+  document.getElementById('cCall').checked=(p.contact||[]).includes('Call');
+  document.getElementById('pPickup').value=p.pickup||''; document.getElementById('pDropoff').value=p.dropoff||'';
+  document.getElementById('pTip').value=p.tip||''; document.getElementById('pNotes').value=p.notes||'';
+  document.getElementById('pConfirmed').checked = seat.confirmedId===pid;
+  document.getElementById('passengerForm').style.display='block'; checkBlocklist();
+}
+function savePassenger(){
+  const seat = state.seats.find(s=>s.id===activeSeatId);
+  const contact=[]; if(document.getElementById('cWhatsapp').checked) contact.push('WhatsApp');
+  if(document.getElementById('cText').checked) contact.push('Text'); if(document.getElementById('cCall').checked) contact.push('Call');
+  const data = { id: editingCandidateId||('p'+Date.now()), name: document.getElementById('pName').value.trim(),
+    gender: document.getElementById('pGender').value, phone: document.getElementById('pPhone').value.trim(), contact,
+    pickup: document.getElementById('pPickup').value.trim(), dropoff: document.getElementById('pDropoff').value.trim(),
+    tip: parseFloat(document.getElementById('pTip').value)||0, notes: document.getElementById('pNotes').value.trim() };
+  if(editingCandidateId){ const idx=seat.passengers.findIndex(p=>p.id===editingCandidateId); seat.passengers[idx]=data; }
+  else seat.passengers.push(data);
+  if(document.getElementById('pConfirmed').checked) seat.confirmedId=data.id;
+  else if(seat.confirmedId===data.id) seat.confirmedId=null;
+  if(data.phone){ directory[data.phone]=directory[data.phone]||{blocked:false,reason:'',history:[],hasWhatsApp:null}; directory[data.phone].history.push({name:data.name,date:new Date().toISOString(),tip:data.tip}); }
+  saveAll();
+  openSeatModal(activeSeatId);
+}
+function confirmPassenger(pid){ const seat=state.seats.find(s=>s.id===activeSeatId); seat.confirmedId=pid; saveAll(); openSeatModal(activeSeatId); }
+function removePassenger(pid){ const seat=state.seats.find(s=>s.id===activeSeatId); seat.passengers=seat.passengers.filter(p=>p.id!==pid); if(seat.confirmedId===pid) seat.confirmedId=null; saveAll(); openSeatModal(activeSeatId); }
+function blockPassenger(pid){
+  const seat=state.seats.find(s=>s.id===activeSeatId); const p=seat.passengers.find(x=>x.id===pid);
+  const reason=prompt('Reason for blocking '+(p.name||'this customer')+' (optional):','');
+  if(reason===null) return;
+  if(p.phone){ directory[p.phone]=directory[p.phone]||{blocked:false,reason:'',history:[]}; directory[p.phone].blocked=true; directory[p.phone].reason=reason; }
+  saveAll(); alert("Blocked. You'll be warned if this number returns.");
+}
+function movePassenger(pid){
+  const ordered = orderedSeats(state.seats).filter(s=>s.id!==activeSeatId);
+  const listStr = ordered.map(s=>getSeatNumber(state.seats, s.id)).join(', ');
+  const choiceNum = prompt('Move to which seat number?\n'+listStr);
+  if(!choiceNum) return;
+  const target = ordered.find(s=>getSeatNumber(state.seats,s.id)===parseInt(choiceNum));
+  if(!target) return alert('Seat not found.');
+  const fromSeat = state.seats.find(s=>s.id===activeSeatId);
+  const p = fromSeat.passengers.find(x=>x.id===pid);
+  fromSeat.passengers = fromSeat.passengers.filter(x=>x.id!==pid);
+  if(fromSeat.confirmedId===pid) fromSeat.confirmedId=null;
+  target.passengers.push(p);
+  saveAll(); closeModal();
+}
+function exportManifest(){
+  let text = `Trip: ${state.tripName||'(untitled)'}\n\n`;
+  const ordered = orderedSeats(state.seats);
+  ordered.forEach((seat,i)=>{
+    const p = seat.passengers.find(x=>x.id===seat.confirmedId);
+    text += `Seat ${i+1}: `;
+    text += p ? `${p.name} (${p.phone}) - ${p.pickup} → ${p.dropoff} - $${p.tip} - CONFIRMED\n` : `Not confirmed (${seat.passengers.length} option(s) pending)\n`;
+  });
+  navigator.clipboard.writeText(text).then(()=>alert('Manifest copied!'));
+}
+
+// DASHBOARD
+function openDashboard(){
+  const confirmed = state.seats.filter(s=>s.confirmedId);
+  const total = confirmed.reduce((sum,s)=>{ const p=s.passengers.find(x=>x.id===s.confirmedId); return sum+(p?p.tip:0); },0);
+  const gas = settings.gasCost||0;
+  const net = total-gas;
+  document.getElementById('gasCostInput').value = gas;
+  document.getElementById('dashStats').innerHTML = `
+    <div class="dash-stat">Confirmed seats: ${confirmed.length}/${state.seats.length}</div>
+    <div class="dash-stat">Collected: $${total}</div>
+    <div class="dash-stat">Gas cost: $${gas}</div>
+    <div class="dash-stat">Net: <span class="${net>=0?'dash-net-pos':'dash-net-neg'}">$${net}</span></div>`;
+  document.getElementById('dashboardModal').classList.add('open');
+}
+function closeDashboard(){ document.getElementById('dashboardModal').classList.remove('open'); }
+function saveGasCost(){ settings.gasCost = parseFloat(document.getElementById('gasCostInput').value)||0; saveAll(); }
+
+// ---------- SETTINGS EDITOR: row tracks + 3 vertical lanes, driver draggable too ----------
+function openSettings(){
+  document.getElementById('seatCountInput').value = settings.grid.seats.length+1;
+  document.getElementById('themeToggle').checked = settings.theme==='dark';
+  renderLayoutEditor(); renderBlockedList();
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings(){ document.getElementById('settingsModal').classList.remove('open'); }
+
+function renderLayoutEditor(){
+  const editor = document.getElementById('layoutEditor'); editor.innerHTML='';
+  const scale=0.85;
+  const w = (TRACK_WIDTH+60)*scale;
+  const h = (TOP_PAD + settings.grid.rowCount*ROW_H + 40)*scale;
+  editor.style.width=w+'px'; editor.style.height=h+'px';
+
+  // 3 vertical lane guide-lines, full height, top to bottom
+  COL_CENTERS.forEach(cx=>{
+    const vline=document.createElement('div'); vline.className='col-line';
+    vline.style.left=((cx+40)*scale)+'px'; vline.style.top='6px'; vline.style.height=(h-12)+'px';
+    editor.appendChild(vline);
+  });
+  // horizontal row track-lines
+  for(let r=0;r<settings.grid.rowCount;r++){
+    const line=document.createElement('div'); line.className='track-line';
+    line.style.top=((TOP_PAD+r*ROW_H+27)*scale)+'px';
+    line.style.left=(40*scale)+'px'; line.style.width=(TRACK_WIDTH*scale)+'px';
+    line.addEventListener('click', (e)=>{
+      const rect=line.getBoundingClientRect();
+      const clickX = (e.clientX-rect.left)/scale;
+      const col = colFromClickX(clickX);
+      const driverHere = r===0 && settings.grid.driverCol===col;
+      const occupied = settings.grid.seats.some(s=>s.row===r && s.col===col) || driverHere;
+      if(!occupied){ if(confirm('Add a seat here?')){ settings.grid.seats.push({id:'s'+Date.now(), row:r, col}); renderLayoutEditor(); } }
+    });
+    editor.appendChild(line);
+  }
+  // driver, now draggable between the 3 lanes on row 0
+  const drv = document.createElement('div'); drv.className='layout-driver';
+  drv.style.left=((colX(settings.grid.driverCol)+40)*scale)+'px';
+  drv.style.top=(TOP_PAD*scale)+'px'; drv.textContent='Driver';
+  makeDraggableLane(drv, {row:0, col:settings.grid.driverCol}, scale, true);
+  editor.appendChild(drv);
+  // seats
+  settings.grid.seats.forEach(seat=>{
+    const num = getSeatNumber(settings.grid.seats, seat.id);
+    const el=document.createElement('div'); el.className='layout-seat';
+    el.style.left=((colX(seat.col)+40)*scale)+'px';
+    el.style.top=((TOP_PAD+seat.row*ROW_H)*scale)+'px';
+    el.textContent=num;
+    makeDraggableLane(el, seat, scale, false);
+    editor.appendChild(el);
+  });
+}
+// Drag constrained to fixed row, snapping to nearest of the 3 vertical lanes on release.
+// isDriver=true handles the driver marker specially (updates settings.grid.driverCol, never deletable).
+function makeDraggableLane(el, seatRef, scale, isDriver){
+  let moved=false;
+  el.addEventListener('pointerdown', e=>{
+    e.preventDefault(); e.stopPropagation(); el.setPointerCapture(e.pointerId);
+    moved=false;
+    const startX=e.clientX;
+    const origLeft = colX(seatRef.col);
+    function onMove(e){
+      const dx=(e.clientX-startX)/scale;
+      if(Math.abs(dx)>4) moved=true;
+      const newLeft = Math.max(0, Math.min(TRACK_WIDTH-SEAT_W, origLeft+dx));
+      el.style.left=((newLeft+40)*scale)+'px';
+    }
+    function onUp(e){
+      el.releasePointerCapture(e.pointerId);
+      el.removeEventListener('pointermove',onMove); el.removeEventListener('pointerup',onUp);
+      if(!moved){
+        if(!isDriver){ if(confirm('Remove this seat?')){ settings.grid.seats = settings.grid.seats.filter(s=>s.id!==seatRef.id); } }
+        renderLayoutEditor(); return;
+      }
+      const curLeft = parseFloat(el.style.left)/scale - 40;
+      const centerX = curLeft + SEAT_W/2;
+      const newCol = colFromClickX(centerX);
+      if(isDriver){
+        const occupied = settings.grid.seats.some(s=>s.row===0 && s.col===newCol);
+        if(!occupied) settings.grid.driverCol = newCol;
+      } else {
+        const occupied = settings.grid.seats.some(s=>s.id!==seatRef.id && s.row===seatRef.row && s.col===newCol) || (seatRef.row===0 && settings.grid.driverCol===newCol);
+        if(!occupied) seatRef.col = newCol;
+      }
+      renderLayoutEditor();
+    }
+    el.addEventListener('pointermove',onMove); el.addEventListener('pointerup',onUp);
+  });
+}
+function addRow(){ settings.grid.rowCount++; renderLayoutEditor(); }
+function removeRow(){
+  if(settings.grid.rowCount<=1) return;
+  const lastRow = settings.grid.rowCount-1;
+  const hasSeats = settings.grid.seats.some(s=>s.row===lastRow);
+  if(hasSeats && !confirm('This row has seats on it. Remove the row and its seats?')) return;
+  settings.grid.seats = settings.grid.seats.filter(s=>s.row!==lastRow);
+  settings.grid.rowCount--; renderLayoutEditor();
+}
+function regenerateLayout(){
+  const n = parseInt(document.getElementById('seatCountInput').value)||7;
+  if(!confirm('This replaces your current layout with a realistic default for '+n+' seats. Continue?')) return;
+  settings.grid = buildDefaultGrid(n); renderLayoutEditor();
+}
+function saveLayout(){
+  saveAll();
+  state.seats = settings.grid.seats.map(s=>({id:s.id,row:s.row,col:s.col,passengers:[],confirmedId:null}));
+  state.driverCol = settings.grid.driverCol||0;
+  saveAll(); renderSeats(); alert('Layout saved as default for all future trips.');
+}
+function toggleTheme(){ settings.theme = document.getElementById('themeToggle').checked?'dark':'light'; document.body.classList.toggle('dark', settings.theme==='dark'); saveAll(); }
+function renderBlockedList(){
+  const div = document.getElementById('blockedList'); div.innerHTML='';
+  const blocked = Object.entries(directory).filter(([k,v])=>v.blocked);
+  if(blocked.length===0){ div.innerHTML='<small class="hint">No blocked customers.</small>'; return; }
+  blocked.forEach(([phone,v])=>{
+    const row=document.createElement('div'); row.className='candidate-row';
+    row.innerHTML=`<div class="candidate-info">📞 ${phone}<br>Reason: ${v.reason||'-'}</div>
+      <div class="candidate-actions"><button class="success" onclick="unblock('${phone}')">Unblock</button></div>`;
+    div.appendChild(row);
+  });
+}
+function unblock(phone){ directory[phone].blocked=false; saveAll(); renderBlockedList(); }
+
+renderSeats();
+</script>
+</body>
+</html>
